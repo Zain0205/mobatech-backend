@@ -1,6 +1,7 @@
 package main
 
 import (
+	"fmt"
 	"backend/config"
 	"backend/models"
 	"backend/routes"
@@ -11,6 +12,7 @@ import (
 )
 
 func main() {
+	fmt.Println("MAIN EXECUTED")
 	// Initialize Database Connection
 	config.ConnectDatabase()
 
@@ -45,6 +47,8 @@ func main() {
 	routes.SetupEmergencyRoutes(r, config.DB)
 	// Setup Pharmacy Routes
 	routes.SetupPharmacyRoutes(r, config.DB)
+	// Setup Doctor Routes
+	routes.SetupDoctorRoutes(r, config.DB)
 
 	// Start the server
 	r.Run(":8080")

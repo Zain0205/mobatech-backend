@@ -55,6 +55,9 @@ func ConnectDatabase() {
 		&models.PharmacyOrderItem{},
 		&models.Cart{},
 		&models.CartItem{},
+		&models.Doctor{},
+		&models.DoctorSchedule{},
+		&models.Appointment{},
 	)
 	if err != nil {
 		log.Fatal("Failed to connect to database!", err)
