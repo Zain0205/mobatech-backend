@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"log"
 	"os"
+	"backend/models"
 
 	"github.com/joho/godotenv"
 	"gorm.io/driver/mysql"
@@ -24,11 +25,37 @@ func ConnectDatabase() {
 	dbPort := os.Getenv("DB_PORT")
 	dbName := os.Getenv("DB_NAME")
 
-	dsn := fmt.Sprintf("%s:%s@tcp(%s:%s)/%s?charset=utf8mb4&parseTime=True&loc=Local",
-		dbUser, dbPassword, dbHost, dbPort, dbName,
-	)
+	var dsn string
+	if dbPassword != "" {
+		dsn = fmt.Sprintf("%s:%s@tcp(%s:%s)/%s?charset=utf8mb4&parseTime=True&loc=Local",
+			dbUser, dbPassword, dbHost, dbPort, dbName,
+		)
+	} else {
+		dsn = fmt.Sprintf("%s@tcp(%s:%s)/%s?charset=utf8mb4&parseTime=True&loc=Local",
+			dbUser, dbHost, dbPort, dbName,
+		)
+	}
 
 	database, err := gorm.Open(mysql.Open(dsn), &gorm.Config{})
+	if err != nil {
+		log.Fatal("Failed to connect to database!", err)
+	}
+
+	err = database.AutoMigrate(
+		&models.User{},
+		&models.ChatSession{},
+		&models.ChatMessage{},
+		&models.HospitalService{},
+		&models.EmergencyRequest{},
+		&models.MedicineCategory{},
+		&models.Medicine{},
+		&models.Prescription{},
+		&models.PrescriptionItem{},
+		&models.PharmacyOrder{},
+		&models.PharmacyOrderItem{},
+		&models.Cart{},
+		&models.CartItem{},
+	)
 	if err != nil {
 		log.Fatal("Failed to connect to database!", err)
 	}
