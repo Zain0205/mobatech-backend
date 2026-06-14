@@ -3,8 +3,10 @@ package main
 import (
 	"backend/config"
 	"backend/models"
+	"backend/routes"
 	"net/http"
 
+	"github.com/gin-contrib/cors"
 	"github.com/gin-gonic/gin"
 )
 
@@ -12,11 +14,12 @@ func main() {
 	// Initialize Database Connection
 	config.ConnectDatabase()
 
-	// Run Auto Migrations for our example User model
-	config.DB.AutoMigrate(&models.User{})
+	// Run Auto Migrations for our example User model and Chat models
+	config.DB.AutoMigrate(&models.User{}, &models.ChatSession{}, &models.ChatMessage{})
 
 	// Initialize Gin Router
 	r := gin.Default()
+	r.Use(cors.Default())
 
 	// Health check endpoint
 	r.GET("/ping", func(c *gin.Context) {
@@ -31,6 +34,17 @@ func main() {
 		config.DB.Find(&users)
 		c.JSON(http.StatusOK, gin.H{"data": users})
 	})
+
+	// Setup Auth Routes
+	routes.SetupAuthRoutes(r, config.DB)
+	// Setup Chat Routes
+	routes.SetupChatRoutes(r, config.DB)
+	// Setup Hospital Service Routes
+	routes.SetupHospitalServiceRoutes(r, config.DB)
+	// Setup Emergency Routes
+	routes.SetupEmergencyRoutes(r, config.DB)
+	// Setup Pharmacy Routes
+	routes.SetupPharmacyRoutes(r, config.DB)
 
 	// Start the server
 	r.Run(":8080")
