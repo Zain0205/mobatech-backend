@@ -7,6 +7,7 @@ import (
 
 	"github.com/gin-gonic/gin"
 	"gorm.io/gorm"
+	"backend/middleware"
 )
 
 func SetupAuthRoutes(r *gin.Engine, db *gorm.DB) {
@@ -18,5 +19,12 @@ func SetupAuthRoutes(r *gin.Engine, db *gorm.DB) {
 	{
 		authGroup.POST("/register", controller.Register)
 		authGroup.POST("/login", controller.Login)
+		authGroup.GET("/me", middleware.AuthMiddleware(), controller.Me)
+	}
+
+	userGroup := r.Group("/api/users")
+	userGroup.Use(middleware.AuthMiddleware())
+	{
+		userGroup.PUT("/profile", controller.UpdateProfile)
 	}
 }

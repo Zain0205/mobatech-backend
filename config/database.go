@@ -58,6 +58,8 @@ func ConnectDatabase() {
 		&models.Doctor{},
 		&models.DoctorSchedule{},
 		&models.Appointment{},
+		&models.Polyclinic{},
+		&models.PolyclinicSchedule{},
 	)
 	if err != nil {
 		log.Fatal("Failed to connect to database!", err)

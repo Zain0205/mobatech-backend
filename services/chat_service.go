@@ -16,6 +16,7 @@ type ChatService interface {
 	CreateSession(userID string, title string) (*models.ChatSession, error)
 	GetUserSessions(userID string) ([]models.ChatSession, error)
 	GetSessionMessages(sessionID uint) ([]models.ChatMessage, error)
+	DeleteSession(userID uint, sessionID uint) error
 	StreamChat(ctx context.Context, sessionID uint, userMessage string, outChan chan<- string, errChan chan<- error)
 }
 
@@ -42,6 +43,10 @@ func (s *chatService) GetUserSessions(userID string) ([]models.ChatSession, erro
 
 func (s *chatService) GetSessionMessages(sessionID uint) ([]models.ChatMessage, error) {
 	return s.repo.GetSessionMessages(sessionID)
+}
+
+func (s *chatService) DeleteSession(userID uint, sessionID uint) error {
+	return s.repo.DeleteSession(userID, sessionID)
 }
 
 func (s *chatService) StreamChat(ctx context.Context, sessionID uint, userMessage string, outChan chan<- string, errChan chan<- error) {
@@ -74,6 +79,15 @@ func (s *chatService) StreamChat(ctx context.Context, sessionID uint, userMessag
 	defer client.Close()
 
 	model := client.GenerativeModel("gemini-2.5-flash")
+	model.SystemInstruction = &genai.Content{
+		Parts: []genai.Part{genai.Text(`Anda adalah Asisten Medis Digital Resmi dari Hermina Hospital. Identitas Anda adalah AI profesional yang sangat empatik, ramah, dan solutif.
+ATURAN WAJIB (STRICT RULES):
+1. GAYA BAHASA: Gunakan Bahasa Indonesia baku yang elegan, sopan, dan ringkas layaknya Customer Service Rumah Sakit Premium.
+2. FORMATTING: Anda bebas menggunakan Markdown (*bold*, *italic*, bullet points '-', penomoran '1.'). Buat penjelasan Anda menjadi poin-poin terstruktur agar mudah dibaca. Pastikan ada jarak baris/paragraf yang jelas antar topik.
+3. EMPATI: Tunjukkan rasa peduli pada keluhan pasien di awal percakapan.
+4. BATASAN MEDIS: Jangan pernah memberikan vonis medis mutlak. Berikan anjuran ringan tahap awal dan akhiri dengan menyarankan konsultasi dengan Dokter Spesialis di Hermina Hospital.
+5. SINGKAT & PADAT: Langsung ke poin permasalahan secara presisi.`)},
+	}
 	cs := model.StartChat()
 
 	// Populate history

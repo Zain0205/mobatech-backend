@@ -14,6 +14,8 @@ import (
 type AuthService interface {
 	Register(fullName, email, phone, password string) (*models.User, error)
 	Login(email, password string) (string, *models.User, error)
+	GetUser(userID uint) (*models.User, error)
+	UpdateProfile(userID uint, fullName, phone, imagePath string) (*models.User, error)
 }
 
 type authService struct {
@@ -70,4 +72,31 @@ func (s *authService) Login(email, password string) (string, *models.User, error
 	}
 
 	return tokenString, user, nil
+}
+
+func (s *authService) GetUser(userID uint) (*models.User, error) {
+	return s.repo.FindByID(userID)
+}
+
+func (s *authService) UpdateProfile(userID uint, fullName, phone, imagePath string) (*models.User, error) {
+	user, err := s.repo.FindByID(userID)
+	if err != nil {
+		return nil, errors.New("user not found")
+	}
+
+	if fullName != "" {
+		user.FullName = fullName
+	}
+	if phone != "" {
+		user.PhoneNumber = phone
+	}
+	if imagePath != "" {
+		user.ImageURL = imagePath
+	}
+
+	if err := s.repo.UpdateUser(user); err != nil {
+		return nil, err
+	}
+
+	return user, nil
 }

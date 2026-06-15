@@ -23,6 +23,8 @@ func main() {
 	r := gin.Default()
 	r.Use(cors.Default())
 
+	r.Static("/uploads", "./uploads")
+
 	// Health check endpoint
 	r.GET("/ping", func(c *gin.Context) {
 		c.JSON(http.StatusOK, gin.H{
@@ -49,6 +51,8 @@ func main() {
 	routes.SetupPharmacyRoutes(r, config.DB)
 	// Setup Doctor Routes
 	routes.SetupDoctorRoutes(r, config.DB)
+	// Setup Polyclinic Routes
+	routes.SetupPolyclinicRoutes(r, config.DB)
 
 	// Start the server
 	r.Run(":8080")
