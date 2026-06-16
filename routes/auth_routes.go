@@ -26,5 +26,7 @@ func SetupAuthRoutes(r *gin.Engine, db *gorm.DB) {
 	userGroup.Use(middleware.AuthMiddleware())
 	{
 		userGroup.PUT("/profile", controller.UpdateProfile)
+		userGroup.POST("/family-members", controller.AddFamilyMember)
+		userGroup.DELETE("/family-members/:id", controller.DeleteFamilyMember)
 	}
 }

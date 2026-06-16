@@ -15,7 +15,9 @@ type AuthService interface {
 	Register(fullName, email, phone, password string) (*models.User, error)
 	Login(email, password string) (string, *models.User, error)
 	GetUser(userID uint) (*models.User, error)
-	UpdateProfile(userID uint, fullName, phone, imagePath string) (*models.User, error)
+	UpdateProfile(userID uint, fullName, phone, imagePath, bloodType string, height int, weight int, allergies, dob, gender string) (*models.User, error)
+	AddFamilyMember(member *models.FamilyMember) error
+	DeleteFamilyMember(id uint) error
 }
 
 type authService struct {
@@ -78,7 +80,7 @@ func (s *authService) GetUser(userID uint) (*models.User, error) {
 	return s.repo.FindByID(userID)
 }
 
-func (s *authService) UpdateProfile(userID uint, fullName, phone, imagePath string) (*models.User, error) {
+func (s *authService) UpdateProfile(userID uint, fullName, phone, imagePath, bloodType string, height int, weight int, allergies, dob, gender string) (*models.User, error) {
 	user, err := s.repo.FindByID(userID)
 	if err != nil {
 		return nil, errors.New("user not found")
@@ -93,10 +95,36 @@ func (s *authService) UpdateProfile(userID uint, fullName, phone, imagePath stri
 	if imagePath != "" {
 		user.ImageURL = imagePath
 	}
+	if bloodType != "" {
+		user.BloodType = bloodType
+	}
+	if height > 0 {
+		user.Height = height
+	}
+	if weight > 0 {
+		user.Weight = weight
+	}
+	if allergies != "" {
+		user.Allergies = allergies
+	}
+	if dob != "" {
+		user.DateOfBirth = dob
+	}
+	if gender != "" {
+		user.Gender = gender
+	}
 
 	if err := s.repo.UpdateUser(user); err != nil {
 		return nil, err
 	}
 
 	return user, nil
+}
+
+func (s *authService) AddFamilyMember(member *models.FamilyMember) error {
+	return s.repo.AddFamilyMember(member)
+}
+
+func (s *authService) DeleteFamilyMember(id uint) error {
+	return s.repo.DeleteFamilyMember(id)
 }

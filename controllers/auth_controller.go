@@ -1,9 +1,11 @@
 package controllers
 
 import (
+	"backend/models"
 	"backend/services"
 	"fmt"
 	"net/http"
+	"strconv"
 	"time"
 
 	"github.com/gin-gonic/gin"
@@ -91,6 +93,16 @@ func (c *AuthController) UpdateProfile(ctx *gin.Context) {
 	fullName := ctx.PostForm("full_name")
 	phone := ctx.PostForm("phone_number")
 
+	bloodType := ctx.PostForm("blood_type")
+	heightStr := ctx.PostForm("height")
+	weightStr := ctx.PostForm("weight")
+	allergies := ctx.PostForm("allergies")
+	dob := ctx.PostForm("date_of_birth")
+	gender := ctx.PostForm("gender")
+
+	height, _ := strconv.Atoi(heightStr)
+	weight, _ := strconv.Atoi(weightStr)
+
 	file, err := ctx.FormFile("image")
 	imagePath := ""
 	if err == nil {
@@ -101,7 +113,7 @@ func (c *AuthController) UpdateProfile(ctx *gin.Context) {
 		}
 	}
 
-	user, err := c.service.UpdateProfile(uint(userID.(float64)), fullName, phone, imagePath)
+	user, err := c.service.UpdateProfile(uint(userID.(float64)), fullName, phone, imagePath, bloodType, height, weight, allergies, dob, gender)
 	if err != nil {
 		ctx.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
@@ -110,5 +122,54 @@ func (c *AuthController) UpdateProfile(ctx *gin.Context) {
 	ctx.JSON(http.StatusOK, gin.H{
 		"message": "Profile updated successfully",
 		"user":    user,
+	})
+}
+
+func (c *AuthController) AddFamilyMember(ctx *gin.Context) {
+	userID, exists := ctx.Get("user_id")
+	if !exists {
+		ctx.JSON(http.StatusUnauthorized, gin.H{"error": "Unauthorized"})
+		return
+	}
+
+	var req models.FamilyMember
+	if err := ctx.ShouldBindJSON(&req); err != nil {
+		ctx.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+
+	req.UserID = uint(userID.(float64))
+	if err := c.service.AddFamilyMember(&req); err != nil {
+		ctx.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+
+	ctx.JSON(http.StatusOK, gin.H{
+		"message": "Family member added successfully",
+		"family_member": req,
+	})
+}
+
+func (c *AuthController) DeleteFamilyMember(ctx *gin.Context) {
+	_, exists := ctx.Get("user_id")
+	if !exists {
+		ctx.JSON(http.StatusUnauthorized, gin.H{"error": "Unauthorized"})
+		return
+	}
+
+	idStr := ctx.Param("id")
+	id, err := strconv.Atoi(idStr)
+	if err != nil {
+		ctx.JSON(http.StatusBadRequest, gin.H{"error": "Invalid ID"})
+		return
+	}
+
+	if err := c.service.DeleteFamilyMember(uint(id)); err != nil {
+		ctx.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+
+	ctx.JSON(http.StatusOK, gin.H{
+		"message": "Family member deleted successfully",
 	})
 }

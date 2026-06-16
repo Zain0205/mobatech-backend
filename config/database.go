@@ -43,6 +43,7 @@ func ConnectDatabase() {
 
 	err = database.AutoMigrate(
 		&models.User{},
+		&models.FamilyMember{},
 		&models.ChatSession{},
 		&models.ChatMessage{},
 		&models.HospitalService{},
