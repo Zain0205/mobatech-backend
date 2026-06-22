@@ -53,6 +53,10 @@ func main() {
 	routes.SetupDoctorRoutes(r, config.DB)
 	// Setup Polyclinic Routes
 	routes.SetupPolyclinicRoutes(r, config.DB)
+	// Setup Patient Support Routes
+	routes.SetupPatientSupportRoutes(r, config.DB)
+	// Setup For You Routes
+	routes.SetupForYouRoutes(r, config.DB)
 
 	// Start the server
 	r.Run(":8080")
