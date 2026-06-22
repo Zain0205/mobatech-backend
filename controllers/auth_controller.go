@@ -9,7 +9,41 @@ import (
 	"time"
 
 	"github.com/gin-gonic/gin"
+	"github.com/go-playground/validator/v10"
 )
+
+func formatValidationError(err error) gin.H {
+	if validationErrs, ok := err.(validator.ValidationErrors); ok {
+		errors := make(map[string][]string)
+		for _, e := range validationErrs {
+			field := e.Field()
+			var msg string
+			switch e.Tag() {
+			case "required":
+				msg = "Kolom ini wajib diisi"
+			case "email":
+				msg = "Format email tidak valid"
+			case "min":
+				msg = "Minimal " + e.Param() + " karakter"
+			default:
+				msg = "Input tidak valid"
+			}
+			errors[field] = append(errors[field], msg)
+		}
+		return gin.H{
+			"success": false,
+			"code":    "VALIDATION_ERROR",
+			"message": "Validasi gagal. Silakan periksa kembali input Anda.",
+			"errors":  errors,
+		}
+	}
+	return gin.H{
+		"success": false,
+		"code":    "BAD_REQUEST",
+		"message": "Format permintaan tidak valid",
+		"error":   err.Error(),
+	}
+}
 
 type AuthController struct {
 	service services.AuthService
@@ -28,13 +62,17 @@ func (c *AuthController) Register(ctx *gin.Context) {
 	}
 
 	if err := ctx.ShouldBindJSON(&req); err != nil {
-		ctx.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		ctx.JSON(http.StatusUnprocessableEntity, formatValidationError(err))
 		return
 	}
 
 	user, err := c.service.Register(req.FullName, req.Email, req.PhoneNumber, req.Password)
 	if err != nil {
-		ctx.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		ctx.JSON(http.StatusConflict, gin.H{
+			"success": false,
+			"code":    "REGISTER_ERROR",
+			"message": "Gagal mendaftar. " + err.Error(),
+		})
 		return
 	}
 
@@ -51,13 +89,17 @@ func (c *AuthController) Login(ctx *gin.Context) {
 	}
 
 	if err := ctx.ShouldBindJSON(&req); err != nil {
-		ctx.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		ctx.JSON(http.StatusUnprocessableEntity, formatValidationError(err))
 		return
 	}
 
 	token, user, err := c.service.Login(req.Email, req.Password)
 	if err != nil {
-		ctx.JSON(http.StatusUnauthorized, gin.H{"error": err.Error()})
+		ctx.JSON(http.StatusUnauthorized, gin.H{
+			"success": false,
+			"code":    "UNAUTHENTICATED",
+			"message": "Email atau kata sandi salah.",
+		})
 		return
 	}
 

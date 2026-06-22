@@ -1,7 +1,6 @@
 package services
 
 import (
-	"backend/models"
 	"backend/repositories"
 	"context"
 	"encoding/json"
@@ -81,18 +80,13 @@ Format output HARUS JSON array, persis seperti ini:
 ]`, chatContext)
 
 	resp, err := model.GenerateContent(ctx, genai.Text(prompt))
-	if err != nil {
-		return nil, fmt.Errorf("gagal generate: %v", err)
-	}
-
-	if len(resp.Candidates) == 0 || len(resp.Candidates[0].Content.Parts) == 0 {
-		return nil, fmt.Errorf("kosong")
-	}
-
 	var jsonStr string
-	for _, part := range resp.Candidates[0].Content.Parts {
-		if text, ok := part.(genai.Text); ok {
-			jsonStr += string(text)
+
+	if err == nil && len(resp.Candidates) > 0 && len(resp.Candidates[0].Content.Parts) > 0 {
+		for _, part := range resp.Candidates[0].Content.Parts {
+			if text, ok := part.(genai.Text); ok {
+				jsonStr += string(text)
+			}
 		}
 	}
 
