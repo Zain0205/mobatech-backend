@@ -51,7 +51,7 @@ func (s *scheduleService) UpdateSchedule(id uint, input *models.DoctorSchedule) 
 	if input.Quota > 0 {
 		schedule.Quota = input.Quota
 	}
-	
+
 	err = s.scheduleRepo.Update(schedule)
 	if err != nil {
 		return nil, err

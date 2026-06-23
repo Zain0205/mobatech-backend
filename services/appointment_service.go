@@ -55,9 +55,7 @@ func (s *appointmentService) BookAppointment(userID uint, req *models.Appointmen
 
 	err = s.appointmentRepo.Create(req)
 	if err != nil {
-		// Rollback booked count if failed
-		schedule.Booked -= 1
-		s.scheduleRepo.Update(schedule)
+		s.rollbackScheduleBooking(schedule)
 		return nil, err
 	}
 
@@ -106,4 +104,9 @@ func (s *appointmentService) ApproveAppointment(id uint) error {
 
 	appointment.Status = "approved"
 	return s.appointmentRepo.Update(appointment)
+}
+
+func (s *appointmentService) rollbackScheduleBooking(schedule *models.DoctorSchedule) {
+	schedule.Booked -= 1
+	s.scheduleRepo.Update(schedule)
 }

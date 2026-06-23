@@ -86,6 +86,24 @@ func (s *authService) UpdateProfile(userID uint, fullName, phone, imagePath, blo
 		return nil, errors.New("user not found")
 	}
 
+	s.applyProfileUpdates(user, fullName, phone, imagePath, bloodType, height, weight, allergies, dob, gender)
+
+	if err := s.repo.UpdateUser(user); err != nil {
+		return nil, err
+	}
+
+	return user, nil
+}
+
+func (s *authService) AddFamilyMember(member *models.FamilyMember) error {
+	return s.repo.AddFamilyMember(member)
+}
+
+func (s *authService) DeleteFamilyMember(id uint) error {
+	return s.repo.DeleteFamilyMember(id)
+}
+
+func (s *authService) applyProfileUpdates(user *models.User, fullName, phone, imagePath, bloodType string, height int, weight int, allergies, dob, gender string) {
 	if fullName != "" {
 		user.FullName = fullName
 	}
@@ -113,18 +131,4 @@ func (s *authService) UpdateProfile(userID uint, fullName, phone, imagePath, blo
 	if gender != "" {
 		user.Gender = gender
 	}
-
-	if err := s.repo.UpdateUser(user); err != nil {
-		return nil, err
-	}
-
-	return user, nil
-}
-
-func (s *authService) AddFamilyMember(member *models.FamilyMember) error {
-	return s.repo.AddFamilyMember(member)
-}
-
-func (s *authService) DeleteFamilyMember(id uint) error {
-	return s.repo.DeleteFamilyMember(id)
 }

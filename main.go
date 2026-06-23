@@ -1,8 +1,8 @@
 package main
 
 import (
-	"fmt"
 	"backend/config"
+	"backend/middleware"
 	"backend/models"
 	"backend/routes"
 	"net/http"
@@ -12,7 +12,6 @@ import (
 )
 
 func main() {
-	fmt.Println("MAIN EXECUTED")
 	// Initialize Database Connection
 	config.ConnectDatabase()
 
@@ -21,6 +20,7 @@ func main() {
 
 	// Initialize Gin Router
 	r := gin.Default()
+	r.Use(middleware.ErrorHandler())
 	r.Use(cors.Default())
 
 	r.Static("/uploads", "./uploads")

@@ -48,11 +48,11 @@ func (s *reminderService) MarkAsRead(id uint, userID uint) error {
 	if err != nil {
 		return errors.New("reminder not found")
 	}
-	
+
 	if reminder.UserID != userID {
 		return errors.New("unauthorized to update this reminder")
 	}
-	
+
 	reminder.IsRead = true
 	return s.repo.Update(reminder)
 }

@@ -2,6 +2,7 @@ package controllers
 
 import (
 	"backend/services"
+	"backend/utils"
 	"fmt"
 	"net/http"
 
@@ -19,16 +20,16 @@ func NewForYouController(service services.ForYouService) *ForYouController {
 func (ctrl *ForYouController) GetRecommendations(c *gin.Context) {
 	userIDStr, exists := c.Get("user_id")
 	if !exists {
-		c.JSON(http.StatusUnauthorized, gin.H{"error": "UNAUTHENTICATED"})
+		c.Error(utils.NewAppError(utils.ErrUnauthenticated, http.StatusUnauthorized, "UNAUTHENTICATED"))
 		return
 	}
 
 	userID := fmt.Sprintf("%v", userIDStr)
 	articles, err := ctrl.service.GenerateRecommendations(c.Request.Context(), userID)
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "INTERNAL_ERROR", "message": err.Error()})
+		c.Error(utils.NewInternalError(err.Error()))
 		return
 	}
 
-	c.JSON(http.StatusOK, gin.H{"data": articles})
+	c.JSON(http.StatusOK, utils.BuildSuccess("OK", "Success", articles))
 }

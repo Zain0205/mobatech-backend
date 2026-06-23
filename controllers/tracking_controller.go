@@ -1,7 +1,9 @@
 package controllers
 
 import (
+	"backend/constants"
 	"backend/services"
+	"backend/utils"
 	"log"
 	"math"
 	"math/rand"
@@ -26,21 +28,18 @@ func NewTrackingController(service services.EmergencyService) *TrackingControlle
 }
 
 func (tc *TrackingController) TrackAmbulance(c *gin.Context) {
-	idStr := c.Param("id")
-	id, err := strconv.Atoi(idStr)
+	id, err := strconv.Atoi(c.Param("id"))
 	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid emergency ID"})
+		c.Error(utils.NewValidationError("Invalid emergency ID"))
 		return
 	}
 
-	// Fetch the emergency request
 	emergency, err := tc.service.GetByID(uint(id))
 	if err != nil {
-		c.JSON(http.StatusNotFound, gin.H{"error": "Emergency request not found"})
+		c.Error(utils.NewAppError(utils.ErrNotFound, http.StatusNotFound, "Emergency request not found"))
 		return
 	}
 
-	// Upgrade HTTP connection to WebSocket
 	conn, err := upgrader.Upgrade(c.Writer, c.Request, nil)
 	if err != nil {
 		log.Printf("WebSocket upgrade failed: %v", err)
@@ -48,78 +47,64 @@ func (tc *TrackingController) TrackAmbulance(c *gin.Context) {
 	}
 	defer conn.Close()
 
-	// Patient destination coordinates
-	patientLat := emergency.Latitude
-	patientLng := emergency.Longitude
+	tc.startSimulation(conn, uint(id), emergency.Latitude, emergency.Longitude)
+}
 
-	// Generate ambulance start position ~2-3km away from patient
+func (tc *TrackingController) startSimulation(conn *websocket.Conn, reqID uint, patientLat, patientLng float64) {
 	rng := rand.New(rand.NewSource(time.Now().UnixNano()))
 	angle := rng.Float64() * 2 * math.Pi
-	// ~0.018-0.027 degrees ≈ 2-3km
-	distance := 0.018 + rng.Float64()*0.009
-	ambulanceLat := patientLat + distance*math.Cos(angle)
-	ambulanceLng := patientLng + distance*math.Sin(angle)
+	distance := constants.SimulatedDistance + rng.Float64()*constants.SimulatedDistanceRand
 
-	totalSteps := 15 + rng.Intn(6) // 15-20 steps
+	ambLat := patientLat + distance*math.Cos(angle)
+	ambLng := patientLng + distance*math.Sin(angle)
+	totalSteps := 15 + rng.Intn(6)
 
-	// Send initial dispatch message
-	initialMsg := map[string]interface{}{
+	tc.sendInitialStatus(conn, reqID)
+	tc.runMovementLoop(conn, reqID, totalSteps, patientLat, patientLng, ambLat, ambLng)
+	tc.finalizeArrival(conn, reqID, patientLat, patientLng)
+}
+
+func (tc *TrackingController) sendInitialStatus(conn *websocket.Conn, reqID uint) {
+	tc.service.UpdateStatus(reqID, constants.StatusDispatched)
+	conn.WriteJSON(map[string]interface{}{
 		"type":    "status_update",
-		"status":  "Dispatched",
-		"message": "Ambulans telah dikirim ke lokasi Anda",
-	}
-	if err := conn.WriteJSON(initialMsg); err != nil {
-		log.Printf("WebSocket write error: %v", err)
-		return
-	}
+		"status":  constants.StatusDispatched,
+		"message": constants.MsgAmbulanceDispatched,
+	})
+}
 
-	// Update status to Dispatched in DB
-	_ = tc.service.UpdateStatus(uint(id), "Dispatched")
-
-	// Simulate ambulance movement
+func (tc *TrackingController) runMovementLoop(conn *websocket.Conn, reqID uint, totalSteps int, pLat, pLng, aLat, aLng float64) {
 	for step := 1; step <= totalSteps; step++ {
-		time.Sleep(2 * time.Second)
-
-		// Linear interpolation toward patient location
+		time.Sleep(constants.SimulatedTimeSleepSec * time.Second)
 		progress := float64(step) / float64(totalSteps)
-		currentLat := ambulanceLat + (patientLat-ambulanceLat)*progress
-		currentLng := ambulanceLng + (patientLng-ambulanceLng)*progress
 
-		// Estimate remaining minutes based on remaining steps (each step ≈ 2 seconds simulated as ~1 min real driving)
-		remainingSteps := totalSteps - step
-		estimatedMinutes := remainingSteps
+		curLat := aLat + (pLat-aLat)*progress
+		curLng := aLng + (pLng-aLng)*progress
+		remaining := totalSteps - step
 
-		// Update tracking in DB
-		_ = tc.service.UpdateTracking(uint(id), currentLat, currentLng, estimatedMinutes, "Dispatched")
-
-		// Send location update to client
-		locationMsg := map[string]interface{}{
+		tc.service.UpdateTracking(reqID, curLat, curLng, remaining, constants.StatusDispatched)
+		err := conn.WriteJSON(map[string]interface{}{
 			"type":              "location_update",
-			"ambulance_lat":     currentLat,
-			"ambulance_lng":     currentLng,
-			"estimated_minutes": estimatedMinutes,
-			"status":            "Dispatched",
-		}
-		if err := conn.WriteJSON(locationMsg); err != nil {
-			log.Printf("WebSocket write error (client disconnected?): %v", err)
+			"ambulance_lat":     curLat,
+			"ambulance_lng":     curLng,
+			"estimated_minutes": remaining,
+			"status":            constants.StatusDispatched,
+		})
+
+		if err != nil {
+			log.Printf("WS write error: %v", err)
 			return
 		}
 	}
+}
 
-	// Ambulance has arrived
-	_ = tc.service.UpdateTracking(uint(id), patientLat, patientLng, 0, "Arrived")
-
-	arrivedMsg := map[string]interface{}{
+func (tc *TrackingController) finalizeArrival(conn *websocket.Conn, reqID uint, pLat, pLng float64) {
+	tc.service.UpdateTracking(reqID, pLat, pLng, 0, "Arrived")
+	conn.WriteJSON(map[string]interface{}{
 		"type":    "status_update",
 		"status":  "Arrived",
 		"message": "Ambulans telah tiba di lokasi Anda",
-	}
-	if err := conn.WriteJSON(arrivedMsg); err != nil {
-		log.Printf("WebSocket write error: %v", err)
-		return
-	}
-
-	// Close connection gracefully
+	})
 	conn.WriteMessage(websocket.CloseMessage,
 		websocket.FormatCloseMessage(websocket.CloseNormalClosure, "Ambulance arrived"))
 }

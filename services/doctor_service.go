@@ -6,7 +6,7 @@ import (
 )
 
 type DoctorService interface {
-	GetAllDoctors(specialization string) ([]models.Doctor, error)
+	GetAllDoctors(specialization string, limit, offset int) ([]models.Doctor, error)
 	GetDoctorByID(id uint) (*models.Doctor, error)
 	CreateDoctor(doctor *models.Doctor) error
 	UpdateDoctor(id uint, input *models.Doctor) (*models.Doctor, error)
@@ -21,8 +21,8 @@ func NewDoctorService(doctorRepo repositories.DoctorRepository) DoctorService {
 	return &doctorService{doctorRepo}
 }
 
-func (s *doctorService) GetAllDoctors(specialization string) ([]models.Doctor, error) {
-	return s.doctorRepo.FindAll(specialization)
+func (s *doctorService) GetAllDoctors(specialization string, limit, offset int) ([]models.Doctor, error) {
+	return s.doctorRepo.FindAll(specialization, limit, offset)
 }
 
 func (s *doctorService) GetDoctorByID(id uint) (*models.Doctor, error) {
@@ -55,7 +55,7 @@ func (s *doctorService) UpdateDoctor(id uint, input *models.Doctor) (*models.Doc
 	if input.ImageURL != "" {
 		doctor.ImageURL = input.ImageURL
 	}
-	
+
 	err = s.doctorRepo.Update(doctor)
 	if err != nil {
 		return nil, err

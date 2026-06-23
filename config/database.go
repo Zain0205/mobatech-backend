@@ -1,10 +1,10 @@
 package config
 
 import (
+	"backend/models"
 	"fmt"
 	"log"
 	"os"
-	"backend/models"
 
 	"github.com/joho/godotenv"
 	"gorm.io/driver/mysql"
@@ -69,5 +69,5 @@ func ConnectDatabase() {
 	}
 
 	DB = database
-	fmt.Println("Database connection successfully opened")
+	log.Println("Database connection successfully opened")
 }

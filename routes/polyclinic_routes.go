@@ -15,7 +15,7 @@ func SetupPolyclinicRoutes(router *gin.Engine, db *gorm.DB) {
 	controller := controllers.NewPolyclinicController(service)
 
 	api := router.Group("/api")
-	
+
 	// Mobile public endpoints
 	api.GET("/polyclinics", controller.GetPolyclinics)
 	api.GET("/polyclinics/:id", controller.GetPolyclinicByID)
@@ -26,7 +26,7 @@ func SetupPolyclinicRoutes(router *gin.Engine, db *gorm.DB) {
 		admin.POST("/polyclinics", controller.CreatePolyclinic)
 		admin.PUT("/polyclinics/:id", controller.UpdatePolyclinic)
 		admin.DELETE("/polyclinics/:id", controller.DeletePolyclinic)
-		
+
 		admin.POST("/polyclinics/:id/schedules", controller.CreateSchedule)
 		admin.PUT("/polyclinics/schedules/:sched_id", controller.UpdateSchedule)
 		admin.DELETE("/polyclinics/schedules/:sched_id", controller.DeleteSchedule)

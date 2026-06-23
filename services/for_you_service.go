@@ -1,6 +1,7 @@
 package services
 
 import (
+	"backend/constants"
 	"backend/repositories"
 	"context"
 	"encoding/json"
@@ -31,9 +32,26 @@ func NewForYouService(chatRepo repositories.ChatRepository) ForYouService {
 }
 
 func (s *forYouService) GenerateRecommendations(ctx context.Context, userID string) ([]Article, error) {
-	sessions, err := s.chatRepo.GetUserSessions(userID)
+	chatContext := s.extractUserContext(userID)
+	prompt := s.buildPrompt(chatContext)
+
+	jsonStr, err := s.fetchGeminiResponse(ctx, prompt)
 	if err != nil {
-		return nil, err
+		return s.getFallbackArticles(), nil
+	}
+
+	var articles []Article
+	if err := json.Unmarshal([]byte(jsonStr), &articles); err != nil {
+		return s.getFallbackArticles(), nil
+	}
+
+	return articles, nil
+}
+
+func (s *forYouService) extractUserContext(userID string) string {
+	sessions, err := s.chatRepo.GetUserSessions(userID)
+	if err != nil || len(sessions) == 0 {
+		return "Pengguna belum pernah konsultasi. Berikan saran kesehatan umum."
 	}
 
 	chatContext := ""
@@ -41,9 +59,9 @@ func (s *forYouService) GenerateRecommendations(ctx context.Context, userID stri
 		if i >= 3 {
 			break
 		}
-		messages, err := s.chatRepo.GetSessionMessages(session.ID)
+		msgs, err := s.chatRepo.GetSessionMessages(session.ID)
 		if err == nil {
-			for _, msg := range messages {
+			for _, msg := range msgs {
 				if msg.Role == "user" {
 					chatContext += "- " + msg.Content + "\n"
 				}
@@ -52,54 +70,47 @@ func (s *forYouService) GenerateRecommendations(ctx context.Context, userID stri
 	}
 
 	if chatContext == "" {
-		chatContext = "Pengguna belum pernah konsultasi. Berikan saran kesehatan umum."
+		return "Pengguna belum pernah konsultasi. Berikan saran kesehatan umum."
 	}
+	return chatContext
+}
 
+func (s *forYouService) buildPrompt(context string) string {
+	return fmt.Sprintf(constants.GeminiForYouPrompt, context)
+}
+
+func (s *forYouService) fetchGeminiResponse(ctx context.Context, prompt string) (string, error) {
 	apiKey := os.Getenv("GEMINI_API_KEY")
 	client, err := genai.NewClient(ctx, option.WithAPIKey(apiKey))
 	if err != nil {
-		return nil, fmt.Errorf("gagal membuat genai client: %v", err)
+		return "", err
 	}
 	defer client.Close()
 
 	model := client.GenerativeModel("gemini-2.5-flash")
 	model.ResponseMIMEType = "application/json"
-	
-	prompt := fmt.Sprintf(`Anda adalah AI Asisten Medis profesional. Berdasarkan keluhan/pertanyaan pengguna ini:
-%s
-
-Hasilkan 4 rekomendasi artikel/tips kesehatan yang PALING RELEVAN dengan kondisi tersebut.
-Format output HARUS JSON array, persis seperti ini:
-[
-  {
-    "title": "string (Judul menarik)",
-    "category": "string (Kategori medis)",
-    "readTime": "string (misal '5 Menit baca')",
-    "content": "string (ISI LENGKAP ARTIKEL. Berikan edukasi medis, tips, dan anjuran yang mendalam, sekitar 2-3 paragraf lengkap dengan formatting newline \n jika perlu)"
-  }
-]`, chatContext)
 
 	resp, err := model.GenerateContent(ctx, genai.Text(prompt))
-	var jsonStr string
+	if err != nil {
+		return "", err
+	}
 
-	if err == nil && len(resp.Candidates) > 0 && len(resp.Candidates[0].Content.Parts) > 0 {
+	var jsonStr string
+	if len(resp.Candidates) > 0 && len(resp.Candidates[0].Content.Parts) > 0 {
 		for _, part := range resp.Candidates[0].Content.Parts {
 			if text, ok := part.(genai.Text); ok {
 				jsonStr += string(text)
 			}
 		}
 	}
+	return jsonStr, nil
+}
 
-	var articles []Article
-	err = json.Unmarshal([]byte(jsonStr), &articles)
-	if err != nil {
-		return []Article{
-			{Title: "Pentingnya Menjaga Pola Makan", Category: "Kesehatan", ReadTime: "12 Menit baca", Content: "Menjaga pola makan sehat sangat penting bagi keseimbangan tubuh dan pencegahan penyakit kronis. Nutrisi yang seimbang membantu sistem kekebalan tubuh bekerja maksimal..."},
-			{Title: "Tips Olahraga Ringan di Rumah", Category: "Kebugaran", ReadTime: "8 Menit baca", Content: "Olahraga tidak harus di gym. Peregangan ringan selama 15 menit setiap pagi dapat melancarkan peredaran darah dan meningkatkan fokus kerja Anda seharian..."},
-			{Title: "Pentingnya Tidur yang Cukup", Category: "Gaya Hidup", ReadTime: "5 Menit baca", Content: "Tidur 7-8 jam sangat dianjurkan untuk proses pemulihan sel-sel otak dan tubuh. Kurang tidur terbukti meningkatkan risiko obesitas dan penyakit kardiovaskular..."},
-			{Title: "Cara Mengatasi Stres Kerja", Category: "Mental", ReadTime: "10 Menit baca", Content: "Manajemen stres dapat dilakukan dengan teknik pernapasan 4-7-8, meluangkan waktu hobi, dan membatasi screen time setelah jam kerja selesai..."},
-		}, nil
+func (s *forYouService) getFallbackArticles() []Article {
+	return []Article{
+		{Title: "Menjaga Pola Makan", Category: "Kesehatan", ReadTime: "12 Menit", Content: "Menjaga pola makan sehat sangat penting bagi keseimbangan tubuh..."},
+		{Title: "Olahraga Ringan", Category: "Kebugaran", ReadTime: "8 Menit", Content: "Peregangan ringan selama 15 menit setiap pagi dapat melancarkan peredaran darah..."},
+		{Title: "Tidur yang Cukup", Category: "Gaya Hidup", ReadTime: "5 Menit", Content: "Tidur 7-8 jam sangat dianjurkan untuk proses pemulihan..."},
+		{Title: "Mengatasi Stres", Category: "Mental", ReadTime: "10 Menit", Content: "Manajemen stres dengan teknik pernapasan 4-7-8..."},
 	}
-
-	return articles, nil
 }

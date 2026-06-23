@@ -2,6 +2,7 @@ package controllers
 
 import (
 	"backend/services"
+	"backend/utils"
 	"fmt"
 	"io"
 	"net/http"
@@ -20,10 +21,10 @@ func NewChatController(service services.ChatService) *ChatController {
 
 func (c *ChatController) CreateSession(ctx *gin.Context) {
 	var req struct {
-		Title  string `json:"title"`
+		Title string `json:"title"`
 	}
 	if err := ctx.BindJSON(&req); err != nil {
-		ctx.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		ctx.Error(utils.NewValidationError(err.Error()))
 		return
 	}
 
@@ -32,51 +33,51 @@ func (c *ChatController) CreateSession(ctx *gin.Context) {
 
 	session, err := c.service.CreateSession(userID, req.Title)
 	if err != nil {
-		ctx.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		ctx.Error(utils.NewInternalError(err.Error()))
 		return
 	}
 
-	ctx.JSON(http.StatusOK, session)
+	ctx.JSON(http.StatusOK, utils.BuildSuccess("OK", "Success", session))
 }
 
 func (c *ChatController) GetUserSessions(ctx *gin.Context) {
 	userIDStr, exists := ctx.Get("user_id")
 	if !exists {
-		ctx.JSON(http.StatusUnauthorized, gin.H{"error": "Unauthorized"})
+		ctx.Error(utils.NewAppError(utils.ErrUnauthenticated, http.StatusUnauthorized, "Unauthorized"))
 		return
 	}
 
 	userID := fmt.Sprintf("%v", userIDStr)
 	sessions, err := c.service.GetUserSessions(userID)
 	if err != nil {
-		ctx.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		ctx.Error(utils.NewInternalError(err.Error()))
 		return
 	}
 
-	ctx.JSON(http.StatusOK, sessions)
+	ctx.JSON(http.StatusOK, utils.BuildSuccess("OK", "Success", sessions))
 }
 
 func (c *ChatController) GetSessionMessages(ctx *gin.Context) {
 	sessionIDStr := ctx.Param("id")
 	sessionID, err := strconv.ParseUint(sessionIDStr, 10, 32)
 	if err != nil {
-		ctx.JSON(http.StatusBadRequest, gin.H{"error": "invalid session id"})
+		ctx.Error(utils.NewValidationError("invalid session id"))
 		return
 	}
 
 	messages, err := c.service.GetSessionMessages(uint(sessionID))
 	if err != nil {
-		ctx.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		ctx.Error(utils.NewInternalError(err.Error()))
 		return
 	}
 
-	ctx.JSON(http.StatusOK, messages)
+	ctx.JSON(http.StatusOK, utils.BuildSuccess("OK", "Success", messages))
 }
 
 func (c *ChatController) DeleteSession(ctx *gin.Context) {
 	userID, exists := ctx.Get("user_id")
 	if !exists {
-		ctx.JSON(http.StatusUnauthorized, gin.H{"error": "Unauthorized"})
+		ctx.Error(utils.NewAppError(utils.ErrUnauthenticated, http.StatusUnauthorized, "Unauthorized"))
 		return
 	}
 
@@ -85,18 +86,18 @@ func (c *ChatController) DeleteSession(ctx *gin.Context) {
 
 	err := c.service.DeleteSession(uint(userID.(float64)), uint(sessionID))
 	if err != nil {
-		ctx.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		ctx.Error(utils.NewInternalError(err.Error()))
 		return
 	}
 
-	ctx.JSON(http.StatusOK, gin.H{"message": "Session deleted"})
+	ctx.JSON(http.StatusOK, utils.BuildSuccess("OK", "Success", nil))
 }
 
 func (c *ChatController) StreamChat(ctx *gin.Context) {
 	sessionIDStr := ctx.Param("id")
 	sessionID, err := strconv.ParseUint(sessionIDStr, 10, 32)
 	if err != nil {
-		ctx.JSON(http.StatusBadRequest, gin.H{"error": "invalid session id"})
+		ctx.Error(utils.NewValidationError("invalid session id"))
 		return
 	}
 
@@ -104,7 +105,7 @@ func (c *ChatController) StreamChat(ctx *gin.Context) {
 		Message string `json:"message"`
 	}
 	if err := ctx.BindJSON(&req); err != nil {
-		ctx.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		ctx.Error(utils.NewValidationError(err.Error()))
 		return
 	}
 
@@ -114,6 +115,10 @@ func (c *ChatController) StreamChat(ctx *gin.Context) {
 	// Context from Request is passed to manage cancellation
 	go c.service.StreamChat(ctx.Request.Context(), uint(sessionID), req.Message, outChan, errChan)
 
+	c.handleStream(ctx, outChan, errChan)
+}
+
+func (c *ChatController) handleStream(ctx *gin.Context, outChan <-chan string, errChan <-chan error) {
 	ctx.Stream(func(w io.Writer) bool {
 		select {
 		case msg, ok := <-outChan:

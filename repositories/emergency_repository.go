@@ -2,6 +2,7 @@ package repositories
 
 import (
 	"backend/models"
+
 	"gorm.io/gorm"
 )
 
@@ -50,9 +51,9 @@ func (r *emergencyRepository) UpdateStatus(id uint, status string) error {
 
 func (r *emergencyRepository) UpdateTracking(id uint, ambulanceLat, ambulanceLng float64, estimatedMinutes int, status string) error {
 	return r.db.Model(&models.EmergencyRequest{}).Where("id = ?", id).Updates(map[string]interface{}{
-		"ambulance_lat":    ambulanceLat,
-		"ambulance_lng":    ambulanceLng,
+		"ambulance_lat":     ambulanceLat,
+		"ambulance_lng":     ambulanceLng,
 		"estimated_minutes": estimatedMinutes,
-		"status":           status,
+		"status":            status,
 	}).Error
 }

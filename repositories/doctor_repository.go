@@ -7,7 +7,7 @@ import (
 )
 
 type DoctorRepository interface {
-	FindAll(specialization string) ([]models.Doctor, error)
+	FindAll(specialization string, limit, offset int) ([]models.Doctor, error)
 	FindByID(id uint) (*models.Doctor, error)
 	Create(doctor *models.Doctor) error
 	Update(doctor *models.Doctor) error
@@ -22,11 +22,17 @@ func NewDoctorRepository(db *gorm.DB) DoctorRepository {
 	return &doctorRepository{db}
 }
 
-func (r *doctorRepository) FindAll(specialization string) ([]models.Doctor, error) {
+func (r *doctorRepository) FindAll(specialization string, limit, offset int) ([]models.Doctor, error) {
 	var doctors []models.Doctor
 	query := r.db.Where("is_active = ?", true)
 	if specialization != "" {
 		query = query.Where("specialization = ?", specialization)
+	}
+	if limit > 0 {
+		query = query.Limit(limit)
+	}
+	if offset > 0 {
+		query = query.Offset(offset)
 	}
 	err := query.Find(&doctors).Error
 	return doctors, err

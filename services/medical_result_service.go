@@ -48,7 +48,7 @@ func (s *medicalResultService) UpdateMedicalResult(req *models.MedicalResult) (*
 	if err != nil {
 		return nil, errors.New("medical result not found")
 	}
-	
+
 	err = s.repo.Update(req)
 	if err != nil {
 		return nil, err

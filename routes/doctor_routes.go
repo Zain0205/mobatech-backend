@@ -1,7 +1,6 @@
 package routes
 
 import (
-	"fmt"
 	"backend/controllers"
 	"backend/middleware"
 	"backend/repositories"
@@ -12,7 +11,6 @@ import (
 )
 
 func SetupDoctorRoutes(router *gin.Engine, db *gorm.DB) {
-	fmt.Println("SetupDoctorRoutes called")
 	// Repositories
 	doctorRepo := repositories.NewDoctorRepository(db)
 	scheduleRepo := repositories.NewScheduleRepository(db)
@@ -49,7 +47,7 @@ func SetupDoctorRoutes(router *gin.Engine, db *gorm.DB) {
 	// If you have admin middleware, add it here. E.g. admin.Use(middleware.AdminMiddleware())
 	// For now using AuthMiddleware or just public if no specific admin auth is provided
 	// In production, should verify admin role
-	// admin.Use(middleware.AuthMiddleware()) 
+	// admin.Use(middleware.AuthMiddleware())
 	{
 		// Doctor CRUD
 		admin.POST("/doctors", doctorController.CreateDoctor)
